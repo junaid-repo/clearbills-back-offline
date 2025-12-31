@@ -1,0 +1,491 @@
+package com.management.shop.repository;
+
+import java.time.LocalDateTime;
+import java.util.List;
+
+import com.management.shop.dto.CustomerSalesReportDto;
+import com.management.shop.dto.GstByCustomerDto;
+import com.management.shop.dto.GstByStateDto;
+import jakarta.transaction.Transactional;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+
+import com.management.shop.entity.BillingEntity;
+
+public interface BillingRepository extends JpaRepository<BillingEntity, Integer> {
+
+    @Query(value = "select * from billing_details where invoice_number=?1  and user_id = ?2", nativeQuery = true)
+    BillingEntity findOrderByReference(String orderReferenceNumber, String userId);
+
+    @Query(value = "select * from billing_details where created_date BETWEEN ?1 AND ?2 and user_id=?3", nativeQuery = true)
+    List<BillingEntity> findPaymentsByDateRange(LocalDateTime fromDate, LocalDateTime toDate, String userId);
+
+    @Query(value = "select * from billing_details where created_date>=?1  and user_id = ?2", nativeQuery = true)
+    List<BillingEntity> findAllByDayRange(LocalDateTime localDateTime, String userId);
+
+    @Query(value = "SELECT * FROM billing_details WHERE created_date >= ?1 AND created_date < ?2 and user_id=?3", nativeQuery = true)
+    List<BillingEntity> findAllCreatedToday(LocalDateTime startOfDay, LocalDateTime endOfDay, String userId);
+
+    // FIX: Quoted "month" and "count" to handle H2 reserved keywords
+    @Query(value = "SELECT FORMATDATETIME(bp.created_date, 'MMM') AS \"month\", " +
+            "SUM(bp.total) AS \"count\", " +
+            "SUM(bd.total_profit_oncp) AS totalProfit " +
+            "FROM billing_payments bp " +
+            "JOIN billing_details bd ON bp.billing_id = bd.id " +
+            "WHERE bp.created_date BETWEEN :fromDate AND :toDate " +
+            "AND bp.user_id = :userId " +
+            "GROUP BY EXTRACT(MONTH FROM bp.created_date), FORMATDATETIME(bp.created_date, 'MMM') " +
+            "ORDER BY EXTRACT(MONTH FROM bp.created_date)",
+            nativeQuery = true)
+    List<Object[]> getMonthlySalesSummary(@Param("fromDate") LocalDateTime fromDate,
+                                          @Param("toDate") LocalDateTime toDate,
+                                          @Param("userId") String userId);
+
+    // FIX: Quoted "month"
+    @Query(value = "SELECT FORMATDATETIME(bp.created_date, 'MMM') AS \"month\", " +
+            "SUM(ps.quantity) AS totalStocksSold " +
+            "FROM billing_payments bp " +
+            "JOIN product_sales ps ON bp.id = ps.billing_id " +
+            "WHERE bp.created_date BETWEEN :fromDate AND :toDate " +
+            "AND bp.user_id = :userId " +
+            "GROUP BY EXTRACT(MONTH FROM bp.created_date), FORMATDATETIME(bp.created_date, 'MMM') " +
+            "ORDER BY EXTRACT(MONTH FROM bp.created_date)", nativeQuery = true)
+    List<Object[]> getMonthlyStocksSold(@Param("fromDate") LocalDateTime fromDate,
+                                        @Param("toDate") LocalDateTime toDate,
+                                        @Param("userId") String userId);
+
+
+    // FIX: Quoted "month" and "count"
+    @Query(value = "SELECT FORMATDATETIME(created_date, 'MMM') AS \"month\", " +
+            "SUM(tax) AS \"count\" " +
+            "FROM billing_payments " +
+            "WHERE created_date BETWEEN :fromDate AND :toDate and user_id=:userId " +
+            "GROUP BY EXTRACT(MONTH FROM created_date), FORMATDATETIME(created_date, 'MMM') " +
+            "ORDER BY EXTRACT(MONTH FROM created_date)", nativeQuery = true)
+    List<Object[]> getMonthlyTaxesSummary(@Param("fromDate") LocalDateTime fromDate,
+                                          @Param("toDate") LocalDateTime toDate, @Param("userId") String userId);
+
+    @Query(value = "select * from billing_details where user_id=?1 and created_date BETWEEN ?2 AND ?3", nativeQuery = true)
+    List<BillingEntity> findAllWithUserId(String userId, LocalDateTime startDate, LocalDateTime endDate);
+
+    @Query(value = "select * from billing_details where user_id=?1 order by created_date desc limit ?2", nativeQuery = true)
+    List<BillingEntity> findNNumberWithUserId(String userId, int count);
+
+    @Query(value = "select * from billing_details where user_id=?1", nativeQuery = true)
+    Page<BillingEntity> findAllByUserId(String userId, Pageable pageable);
+
+    @Query(
+            value = "SELECT b.* FROM billing_details b " +
+                    "JOIN shop_customer s ON b.customer_id = s.id " +
+                    "WHERE b.user_id = :userId " +
+                    "AND (" +
+                    "  LOWER(b.invoice_number) LIKE LOWER(CONCAT('%', :searchTerm, '%')) " +
+                    "  OR LOWER(s.name) LIKE LOWER(CONCAT('%', :searchTerm, '%')) " +
+                    "  OR CAST(b.total_amount AS CHAR) LIKE CONCAT('%', :searchTerm, '%')" +
+                    ")",
+            countQuery = "SELECT COUNT(*) FROM billing_details b " +
+                    "JOIN shop_customer s ON b.customer_id = s.id " +
+                    "WHERE b.user_id = :userId " +
+                    "AND (" +
+                    "  LOWER(b.invoice_number) LIKE LOWER(CONCAT('%', :searchTerm, '%')) " +
+                    "  OR LOWER(s.name) LIKE LOWER(CONCAT('%', :searchTerm, '%')) " +
+                    "  OR CAST(b.total_amount AS CHAR) LIKE CONCAT('%', :searchTerm, '%')" +
+                    ")",
+            nativeQuery = true
+    )
+    Page<BillingEntity> findByUserIdAndSearchNative(
+            @Param("userId") String userId,
+            @Param("searchTerm") String searchTerm,
+            Pageable pageable
+    );
+
+    // FIX: Quoted "day"
+    @Query(value = "SELECT FORMATDATETIME(bp.created_date, 'EEE') AS \"day\", " +
+            "SUM(ps.quantity) AS totalStocksSold " +
+            "FROM billing_payments bp " +
+            "JOIN product_sales ps ON bp.id = ps.billing_id " +
+            "WHERE bp.created_date BETWEEN DATEADD('DAY', -6, CAST(:currentDateMax AS DATE)) AND :currentDateMax " +
+            "AND bp.user_id = :userId " +
+            "GROUP BY CAST(bp.created_date AS DATE), FORMATDATETIME(bp.created_date, 'EEE') " +
+            "ORDER BY CAST(bp.created_date AS DATE)",
+            nativeQuery = true)
+    List<Object[]> getWeeklyStocksSold(@Param("fromDate") LocalDateTime fromDate,
+                                       @Param("currentDateMax") LocalDateTime currentDateMax,
+                                       @Param("userId") String userId);
+
+
+    // FIX: Quoted "day" and "count"
+    @Query(value = "WITH RECURSIVE days(d) AS ( " +
+            "  SELECT CAST(DATEADD('DAY', -6, CAST(:currentDateMax AS DATE)) AS DATE) " +
+            "  UNION ALL " +
+            "  SELECT DATEADD('DAY', 1, d) FROM days WHERE d < CAST(:currentDateMax AS DATE) " +
+            ") " +
+            "SELECT FORMATDATETIME(d, 'EEE') AS \"day\", " +
+            "COALESCE(SUM(bp.total), 0) AS \"count\", " +
+            "COALESCE(SUM(bd.total_profit_oncp), 0) AS totalProfit " +
+            "FROM days " +
+            "LEFT JOIN billing_payments bp ON CAST(bp.created_date AS DATE) = d AND bp.user_id = :userId " +
+            "LEFT JOIN billing_details bd ON bp.billing_id = bd.id " +
+            "GROUP BY d " +
+            "ORDER BY d",
+            nativeQuery = true)
+    List<Object[]> getWeeklySalesSummary(@Param("fromDate") LocalDateTime fromDate,
+                                         @Param("currentDateMax") LocalDateTime currentDateMax,
+                                         @Param("userId") String userId);
+
+    // FIX: Quoted "day" and "count"
+    @Query(value = "WITH RECURSIVE days(d) AS ( " +
+            "  SELECT CAST(DATEADD('DAY', -6, CAST(:currentDateMax AS DATE)) AS DATE) " +
+            "  UNION ALL " +
+            "  SELECT DATEADD('DAY', 1, d) FROM days WHERE d < CAST(:currentDateMax AS DATE) " +
+            "), " +
+            "daily_sales(sale_date, daily_total, daily_profit, daily_stocks_sold) AS ( " +
+            "  SELECT " +
+            "    CAST(bp.created_date AS DATE) AS sale_date, " +
+            "    SUM(bd.total_amount) AS daily_total, " +
+            "    SUM(bd.total_profit_oncp) AS daily_profit, " +
+            "    SUM(bd.units_sold) AS daily_stocks_sold " +
+            "  FROM billing_payments bp " +
+            "  JOIN billing_details bd ON bp.billing_id = bd.id " +
+            "  WHERE bp.user_id = :userId AND bp.created_date >= DATEADD('DAY', -7, CAST(:currentDateMax AS DATE)) " +
+            "  GROUP BY sale_date " +
+            ") " +
+            "SELECT " +
+            "  FORMATDATETIME(d.d, 'EEE') AS \"day\", " +
+            "  COALESCE(ds.daily_total, 0) AS \"count\", " +
+            "  COALESCE(ds.daily_profit, 0) AS totalProfit, " +
+            "  COALESCE(ds.daily_stocks_sold, 0) AS totalStocksSold " +
+            "FROM days d " +
+            "LEFT JOIN daily_sales ds ON d.d = ds.sale_date " +
+            "ORDER BY d.d",
+            nativeQuery = true)
+    List<Object[]> getWeeklySalesAndStocks(@Param("currentDateMax") LocalDateTime currentDateMax,
+                                           @Param("userId") String userId);
+
+    // FIX: Quoted "day" and "count"
+    @Query(value = "WITH RECURSIVE days(d) AS ( " +
+            "  SELECT CAST(DATEADD('DAY', -6, CAST(:currentDateMax AS DATE)) AS DATE) " +
+            "  UNION ALL " +
+            "  SELECT DATEADD('DAY', 1, d) FROM days WHERE d < CAST(:currentDateMax AS DATE) " +
+            "), " +
+            "sales(sale_date, daily_total, daily_profit) AS ( " +
+            "  SELECT " +
+            "    CAST(bp.created_date AS DATE) AS sale_date, " +
+            "    SUM(bd.total_amount) AS daily_total, " +
+            "    SUM(bd.total_profit_oncp) AS daily_profit " +
+            "  FROM billing_payments bp " +
+            "  JOIN billing_details bd ON bp.billing_id = bd.id " +
+            "  WHERE bp.user_id = :userId AND bp.created_date >= DATEADD('DAY', -7, CAST(:currentDateMax AS DATE)) " +
+            "  GROUP BY sale_date " +
+            "), " +
+            "stocks(sale_date, daily_stocks_sold) AS ( " +
+            "  SELECT " +
+            "    CAST(bp.created_date AS DATE) AS sale_date, " +
+            "    SUM(ps.quantity) AS daily_stocks_sold " +
+            "  FROM billing_payments bp " +
+            "  JOIN product_sales ps ON bp.id = ps.billing_id " +
+            "  WHERE bp.user_id = :userId AND bp.created_date >= DATEADD('DAY', -7, CAST(:currentDateMax AS DATE)) " +
+            "  GROUP BY sale_date " +
+            ") " +
+            "SELECT " +
+            "  FORMATDATETIME(d.d, 'EEE') AS \"day\", " +
+            "  COALESCE(ds.daily_total, 0) AS \"count\", " +
+            "  COALESCE(ds.daily_profit, 0) AS totalProfit, " +
+            "  COALESCE(d_stocks.daily_stocks_sold, 0) AS totalStocksSold " +
+            "FROM days d " +
+            "LEFT JOIN daily_sales ds ON d.d = ds.sale_date " +
+            "LEFT JOIN daily_stocks d_stocks ON d.d = d_stocks.sale_date " +
+            "ORDER BY d.d",
+            nativeQuery = true)
+    List<Object[]> getWeeklySalesAndStocksWeekly(@Param("currentDateMax") LocalDateTime currentDateMax,
+                                                 @Param("userId") String userId);
+
+
+    // FIX: Quoted "count"
+    @Query(value = "WITH time_slots AS ( " +
+            "  SELECT 0 AS start_hour, '12 AM - 4 AM' AS slot_label UNION ALL " +
+            "  SELECT 4,  '4 AM - 8 AM'  UNION ALL " +
+            "  SELECT 8,  '8 AM - 12 PM' UNION ALL " +
+            "  SELECT 12, '12 PM - 4 PM' UNION ALL " +
+            "  SELECT 16, '4 PM - 8 PM'  UNION ALL " +
+            "  SELECT 20, '8 PM - 12 AM' " +
+            "), " +
+            "hourly_sales AS ( " +
+            "  SELECT " +
+            "    CASE " +
+            "      WHEN EXTRACT(HOUR FROM bp.created_date) BETWEEN 0 AND 3 THEN 0 " +
+            "      WHEN EXTRACT(HOUR FROM bp.created_date) BETWEEN 4 AND 7 THEN 4 " +
+            "      WHEN EXTRACT(HOUR FROM bp.created_date) BETWEEN 8 AND 11 THEN 8 " +
+            "      WHEN EXTRACT(HOUR FROM bp.created_date) BETWEEN 12 AND 15 THEN 12 " +
+            "      WHEN EXTRACT(HOUR FROM bp.created_date) BETWEEN 16 AND 19 THEN 16 " +
+            "      ELSE 20 " +
+            "    END AS slot_start_hour, " +
+            "    SUM(bd.total_amount) AS hourly_total, " +
+            "    SUM(bd.total_profit_oncp) AS hourly_profit, " +
+            "    SUM(bd.units_sold) AS hourly_stocks_sold " +
+            "  FROM billing_payments bp " +
+            "  JOIN billing_details bd ON bp.billing_id = bd.id " +
+            "  WHERE bp.user_id = :userId AND CAST(bp.created_date AS DATE) = CAST(:currentDate AS DATE) " +
+            "  GROUP BY slot_start_hour " +
+            ") " +
+            "SELECT " +
+            "  ts.slot_label AS timeOfDay, " +
+            "  COALESCE(hs.hourly_total, 0) AS \"count\", " +
+            "  COALESCE(hs.hourly_profit, 0) AS totalProfit, " +
+            "  COALESCE(hs.hourly_stocks_sold, 0) AS totalStocksSold " +
+            "FROM time_slots ts " +
+            "LEFT JOIN hourly_sales hs ON ts.start_hour = hs.slot_start_hour " +
+            "ORDER BY ts.start_hour",
+            nativeQuery = true)
+    List<Object[]> getSalesAndStocksToday(@Param("currentDate") LocalDateTime currentDate,
+                                          @Param("userId") String userId);
+
+    // FIX: Quoted "count"
+    @Query(value = "WITH RECURSIVE weeks(week_end_date) AS ( " +
+            "  SELECT CAST(:currentDateMax AS DATE) " +
+            "  UNION ALL " +
+            "  SELECT CAST(DATEADD('WEEK', -1, week_end_date) AS DATE) " +
+            "  FROM weeks " +
+            "  WHERE DATEADD('WEEK', -1, week_end_date) >= DATEADD('MONTH', -1, CAST(:currentDateMax AS DATE)) " +
+            "), " +
+            "weekly_sales(week_end_date, total, profit, stocks_sold) AS ( " +
+            "  SELECT " +
+            "    w.week_end_date, " +
+            "    SUM(bd.total_amount) AS total, " +
+            "    SUM(bd.total_profit_oncp) AS profit, " +
+            "    SUM(bd.units_sold) AS stocks_sold " +
+            "  FROM weeks w " +
+            "  JOIN billing_payments bp ON CAST(bp.created_date AS DATE) BETWEEN DATEADD('DAY', -6, w.week_end_date) AND w.week_end_date " +
+            "  JOIN billing_details bd ON bp.billing_id = bd.id " +
+            "  WHERE bp.user_id = :userId " +
+            "  GROUP BY w.week_end_date " +
+            ") " +
+            "SELECT " +
+            "  FORMATDATETIME(w.week_end_date, 'MMM d') AS period, " +
+            "  COALESCE(ws.total, 0) AS \"count\", " +
+            "  COALESCE(ws.profit, 0) AS totalProfit, " +
+            "  COALESCE(ws.stocks_sold, 0) AS totalStocksSold " +
+            "FROM weeks w " +
+            "LEFT JOIN weekly_sales ws ON w.week_end_date = ws.week_end_date " +
+            "ORDER BY w.week_end_date ASC",
+            nativeQuery = true)
+    List<Object[]> getSalesAndStocksMonthly(@Param("currentDateMax") LocalDateTime currentDateMax,
+                                            @Param("userId") String userId);
+
+    // FIX: Quoted "count"
+    @Query(value = "WITH RECURSIVE months(month_start) AS ( " +
+            "  SELECT CAST(FORMATDATETIME(DATEADD('MONTH', -11, CAST(:currentDateMax AS DATE)), 'yyyy-MM-01') AS DATE) " +
+            "  UNION ALL " +
+            "  SELECT DATEADD('MONTH', 1, month_start) FROM months WHERE month_start < CAST(FORMATDATETIME(CAST(:currentDateMax AS DATE), 'yyyy-MM-01') AS DATE) " +
+            "), " +
+            "monthly_sales(month_period, total, profit, stocks_sold) AS ( " +
+            "  SELECT " +
+            "    CAST(FORMATDATETIME(bp.created_date, 'yyyy-MM-01') AS DATE) AS month_period, " +
+            "    SUM(bd.total_amount) AS total, " +
+            "    SUM(bd.total_profit_oncp) AS profit, " +
+            "    SUM(bd.units_sold) AS stocks_sold " +
+            "  FROM billing_payments bp " +
+            "  JOIN billing_details bd ON bp.billing_id = bd.id " +
+            "  WHERE bp.user_id = :userId " +
+            "    AND bp.created_date >= CAST(FORMATDATETIME(DATEADD('MONTH', -11, CAST(:currentDateMax AS DATE)), 'yyyy-MM-01') AS DATE) " +
+            "    AND bp.created_date <= :currentDateMax " +
+            "  GROUP BY month_period " +
+            ") " +
+            "SELECT " +
+            "  FORMATDATETIME(m.month_start, 'MMM yyyy') AS period, " +
+            "  COALESCE(ms.total, 0) AS \"count\", " +
+            "  COALESCE(ms.profit, 0) AS totalProfit, " +
+            "  COALESCE(ms.stocks_sold, 0) AS totalStocksSold " +
+            "FROM months m " +
+            "LEFT JOIN monthly_sales ms ON m.month_start = ms.month_period " +
+            "ORDER BY m.month_start ASC",
+            nativeQuery = true)
+    List<Object[]> getSalesAndStocksYearly(@Param("currentDateMax") LocalDateTime currentDateMax,
+                                           @Param("userId") String userId);
+
+    @Query(
+            value = "SELECT * " +
+                    "FROM billing_details " +
+                    "WHERE user_id = ?1 " +
+                    "AND CAST(created_date AS DATE) = CURRENT_DATE " +
+                    "ORDER BY total_amount DESC " +
+                    "LIMIT ?2",
+            nativeQuery = true
+    )
+    List<BillingEntity> findTopNSalesForToday(String userId, int count);
+
+    @Query(
+            value = "SELECT * " +
+                    "FROM billing_details " +
+                    "WHERE user_id = ?1 " +
+                    "AND created_date >= DATEADD('DAY', -7, CURRENT_DATE) " +
+                    "AND created_date < DATEADD('DAY', 1, CURRENT_DATE) " +
+                    "ORDER BY total_amount DESC " +
+                    "LIMIT ?2",
+            nativeQuery = true
+    )
+    List<BillingEntity> findTopNSalesForLastWeek(String userId, int count);
+
+    @Query(
+            value = "SELECT * " +
+                    "FROM billing_details " +
+                    "WHERE user_id = ?1 " +
+                    "AND created_date >= DATEADD('MONTH', -1, CURRENT_DATE) " +
+                    "AND created_date < DATEADD('DAY', 1, CURRENT_DATE) " +
+                    "ORDER BY total_amount DESC " +
+                    "LIMIT ?2",
+            nativeQuery = true
+    )
+    List<BillingEntity> findTopNSalesForLastMonth(String userId, int count);
+
+    @Query(
+            value = "SELECT * " +
+                    "FROM billing_details " +
+                    "WHERE user_id = ?1 " +
+                    "AND created_date >= DATEADD('YEAR', -1, CURRENT_DATE) " +
+                    "AND created_date < DATEADD('DAY', 1, CURRENT_DATE) " +
+                    "ORDER BY total_amount DESC " +
+                    "LIMIT ?2",
+            nativeQuery = true
+    )
+    List<BillingEntity> findTopNSalesForLastYear(String userId, int count);
+
+    @Query(
+            value = "SELECT * " +
+                    "FROM billing_details " +
+                    "WHERE user_id = :userId " +
+                    "AND created_date >= :fromDate " +
+                    "AND created_date < :toDate " +
+                    "ORDER BY total_amount DESC ",
+            nativeQuery = true
+    )
+    List<BillingEntity> findSalesNDays(
+            @Param("userId") String userId,
+            @Param("fromDate") LocalDateTime fromDate,
+            @Param("toDate") LocalDateTime toDate
+    );
+
+    @Query(
+            value = """
+            SELECT *
+            FROM billing_details
+            WHERE user_id = :userId
+              AND created_date BETWEEN :startDate AND :endDate
+            ORDER BY total_amount DESC
+            LIMIT :count
+            """,
+            nativeQuery = true
+    )
+    List<BillingEntity> findTopNSalesForGivenRange(
+            @Param("userId") String userId,
+            @Param("startDate") LocalDateTime startDate,
+            @Param("endDate") LocalDateTime endDate,
+            @Param("count") int count
+    );
+
+    BillingEntity findByInvoiceNumber(String orderNo);
+
+    @Transactional
+    @Modifying
+    @Query(value="update billing_details set due_reminder_count= due_reminder_count+1, updated_by=?2, updated_date=?3 where invoice_number=?1 and user_id=?2", nativeQuery = true)
+    void updateReminderCount(String orderNo, String username, LocalDateTime updatedDate);
+
+    @Transactional
+    @Modifying
+    @Query(value="update billing_details set paying_amount=paying_amount+?4, remaining_amount= remaining_amount-?4, updated_by=?2, updated_date=?3 where invoice_number=?1 and user_id=?2", nativeQuery = true)
+    void updateDuePayment(String orderNo, String username, LocalDateTime updatedDate, Double amount);
+
+    @Query(value="select count(*) from billing_details where user_id=?1 and created_date BETWEEN ?2 AND ?3", nativeQuery = true)
+    Integer countOrdersForToday(String username, LocalDateTime localDateTime, LocalDateTime localDateTime1);
+
+    // FIX: Quoted "month"
+    @Query(value = "SELECT " +
+            "FORMATDATETIME(bp.created_date, 'MMM') AS \"month\", " +
+            "SUM(bd.total_profit_oncp) AS totalProfit, " +
+            "SUM(bd.total_amount) AS totalRevenue, " +
+            "SUM(bd.units_sold) AS totalStock, " +
+            "COUNT(bp.id) AS salesCount " +
+            "FROM billing_payments bp " +
+            "JOIN billing_details bd ON bp.billing_id = bd.id " +
+            "WHERE bp.created_date BETWEEN :fromDate AND :toDate " +
+            "AND bp.user_id = :userId " +
+            "GROUP BY EXTRACT(MONTH FROM bp.created_date), FORMATDATETIME(bp.created_date, 'MMM') " +
+            "ORDER BY EXTRACT(MONTH FROM bp.created_date)",
+            nativeQuery = true)
+    List<Object[]> getMonthlyBillingSummary(@Param("fromDate") LocalDateTime fromDate,
+                                            @Param("toDate") LocalDateTime toDate,
+                                            @Param("userId") String userId);
+
+    @Query(value = "SELECT " +
+            "    c.name as name, " +
+            "    c.email as email, " +
+            "    c.phone as phone, " +
+            "    SUM(b.total_amount) as totalSalesValue, " +
+            "    COUNT(b.id) as orderCount, " +
+            "    GROUP_CONCAT(b.invoice_number SEPARATOR ', ') as invoiceList " +
+            "FROM " +
+            "    shop_customer c " +
+            "JOIN " +
+            "    billing_details b ON c.id = b.customer_id AND c.user_id = b.user_id " +
+            "WHERE " +
+            "    b.created_date BETWEEN ?1 AND ?2 " +
+            "    AND c.user_id = ?3 " +
+            "GROUP BY " +
+            "    c.id, c.name, c.email, c.phone " +
+            "ORDER BY " +
+            "    totalSalesValue DESC", nativeQuery = true)
+    List<CustomerSalesReportDto> findCustomerSalesByDateRange(LocalDateTime fromDate, LocalDateTime toDate, String userId);
+
+    @Query(value = "SELECT " +
+            "    COALESCE(c.state, 'N/A') as state, " +
+            "    SUM(ps.sub_total) as totalTaxableValue, " +
+            "    SUM(ps.cgst) as totalCgst, " +
+            "    SUM(ps.sgst) as totalSgst, " +
+            "    SUM(ps.igst) as totalIgst, " +
+            "    SUM(ps.tax) as totalGst " +
+            "FROM " +
+            "    billing_details b " +
+            "JOIN " +
+            "    shop_customer c ON b.customer_id = c.id AND b.user_id = c.user_id " +
+            "JOIN " +
+            "    product_sales ps ON b.id = ps.billing_id AND b.user_id = ps.user_id " +
+            "WHERE " +
+            "    b.created_date BETWEEN ?1 AND ?2 " +
+            "    AND b.user_id = ?3 " +
+            "GROUP BY " +
+            "    c.state " +
+            "ORDER BY " +
+            "    totalGst DESC", nativeQuery = true)
+    List<GstByStateDto> findGstByState(LocalDateTime fromDate, LocalDateTime toDate, String userId);
+
+    @Query(value = "SELECT " +
+            "    c.name as name, " +
+            "    c.phone as phone, " +
+            "    c.gst_number as gstNumber, " +
+            "    SUM(ps.sub_total) as totalTaxableValue, " +
+            "    SUM(ps.cgst) as totalCgst, " +
+            "    SUM(ps.sgst) as totalSgst, " +
+            "    SUM(ps.igst) as totalIgst, " +
+            "    SUM(ps.tax) as totalGst " +
+            "FROM " +
+            "    billing_details b " +
+            "JOIN " +
+            "    shop_customer c ON b.customer_id = c.id AND b.user_id = c.user_id " +
+            "JOIN " +
+            "    product_sales ps ON b.id = ps.billing_id AND b.user_id = ps.user_id " +
+            "WHERE " +
+            "    b.created_date BETWEEN ?1 AND ?2 " +
+            "    AND b.user_id = ?3 " +
+            "GROUP BY " +
+            "    c.id, c.name, c.phone, c.gst_number " + // Group by customer
+            "ORDER BY " +
+            "    totalGst DESC", nativeQuery = true)
+    List<GstByCustomerDto> findGstByCustomer(LocalDateTime fromDate, LocalDateTime toDate, String userId);
+
+    @Query(value = "select * from billing_details where invoice_number=?1", nativeQuery = true)
+    BillingEntity findOrderByJustReference(String orderReferenceNumber);
+}
