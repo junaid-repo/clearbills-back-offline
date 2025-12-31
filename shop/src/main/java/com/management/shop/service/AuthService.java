@@ -77,10 +77,16 @@ public class AuthService {
     }
 
     public String authAndsetCookies(AuthRequest authRequest, HttpServletResponse response){
-        var regRequest= RegisterRequest.builder().password(authRequest.getPassword()).email("na@na.com").phone("8888888888").password(authRequest.getPassword()).build();
-         registerNewUser( regRequest);
+        var regRequest= RegisterRequest.builder().password(authRequest.getPassword()).fullName("app user").email("na@na.com").phone("8888888888").password(authRequest.getPassword()).confirmPassword(authRequest.getPassword()).build();
 
-        String userSource=  userinfoRepo.findByUsername(authRequest.getUsername()).get().getSource();
+
+        String userSource= null;
+        try {
+            userSource = userinfoRepo.findByUsername(authRequest.getUsername()).get().getSource();
+        } catch (Exception e) {
+            registerNewUser(regRequest);
+            userSource = userinfoRepo.findByUsername(authRequest.getUsername()).get().getSource();
+        }
 
         boolean isUserActive = checkUserStatus(authRequest.getUsername());
         if(userSource.equals("email")||authRequest.getUsername().equals("junaid1")) {
@@ -218,11 +224,8 @@ public class AuthService {
 
         ValidateContactResponse validateContactResponse=    validateContact(ValidateContactRequest.builder().phone(regRequest.getPhone()).email(regRequest.getEmail()).build());
 
-        if(validateContactResponse!=null){
-            if(!validateContactResponse.isStatus()){
-                return RegisterResponse.builder().message("Email/Phone already registered").success(false).build();
-            }
-        }
+
+
 
 
         var userInfo = UserInfo.builder().email(regRequest.getEmail()).isActive(true).name(regRequest.getFullName())
@@ -238,17 +241,11 @@ public class AuthService {
             UserSubscriptions userSub= subsRepo.findLatestActiveOrUpcomingByUsername(appUsername);
 
             if(userSub!=null){
-                String username = appUsername;
-                userInfo.setUsername(username);
                 userInfo.setRoles("ROLE_PREMIUM");
-
-                res = userinfoRepo.save(userInfo);
             }
-
-
-
-
-
+            String username = appUsername;
+            userInfo.setUsername(username);
+            res = userinfoRepo.save(userInfo);
 
 
             //  return RegisterResponse.builder().username(res.getUsername()).build();
