@@ -12,7 +12,9 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/cloud")
@@ -80,11 +82,22 @@ public class CloudBackupController {
     }
 
     // 2. List Backups for the UI
+    // 2. List Backups for the UI (Updated to include Email)
     @GetMapping("/list")
-    public ResponseEntity<List<File>> listDriveBackups() {
+    public ResponseEntity<Map<String, Object>> listDriveBackups() {
         try {
+            // 1. Fetch the list of files
             List<File> files = driveService.listBackups();
-            return ResponseEntity.ok(files);
+
+            // 2. Fetch the connected email
+            String email = driveService.getConnectedEmail();
+
+            // 3. Wrap them in a map
+            Map<String, Object> response = new HashMap<>();
+            response.put("files", files);
+            response.put("email", email);
+
+            return ResponseEntity.ok(response);
         } catch (Exception e) {
             e.printStackTrace();
             return ResponseEntity.status(500).build();

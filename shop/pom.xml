@@ -11,7 +11,7 @@
 	</parent>
 	<groupId>com.management</groupId>
 	<artifactId>shop</artifactId>
-	<version>0.0.3-USER_SPECIFIC</version>
+	<version>0.0.4</version>
 	<name>shop</name>
 	<description>Demo project for Spring Boot</description>
 	<url />

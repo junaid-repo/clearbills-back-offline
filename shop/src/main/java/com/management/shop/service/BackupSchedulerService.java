@@ -62,7 +62,7 @@ public class BackupSchedulerService {
         if ("OFF".equalsIgnoreCase(backupFrequency)) return;
 
         // Check if today matches the frequency requirement
-        if (!shouldRunBackup()) return;
+        if (!shouldRunBackup(backupFrequency)) return;
 
         try {
             LOGGER.info("Starting Scheduled Auto-Backup...");
@@ -88,7 +88,7 @@ public class BackupSchedulerService {
         }
     }
 
-    private boolean shouldRunBackup() {
+    private boolean shouldRunBackup(String backupFrequency) {
         java.time.DayOfWeek day = java.time.LocalDate.now().getDayOfWeek();
         int dayOfMonth = java.time.LocalDate.now().getDayOfMonth();
 
