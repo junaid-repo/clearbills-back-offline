@@ -36,8 +36,8 @@ public interface UserSettingsRepository extends JpaRepository<UserSettingsEntity
 
     @Modifying
     @Transactional
-    @Query(value="update user_settings_entity us set auto_backup_frequency=?1,   updated_date=?3 where username=?2", nativeQuery = true)
-    void updateAutoBackUpSettings(String autoBackUpFrequency, String username, LocalDateTime now);
+    @Query(value = "update user_settings_entity us set auto_backup_frequency=?1, auto_backup_timing=?4,   updated_date=?3 where username=?2", nativeQuery = true)
+    void updateAutoBackUpSettings(String paramString1, String paramString2, LocalDateTime paramLocalDateTime, String paramString3);
 
 
 }

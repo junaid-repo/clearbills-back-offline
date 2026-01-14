@@ -14,12 +14,7 @@ import com.google.api.services.drive.Drive;
 import com.google.api.services.drive.DriveScopes;
 import com.google.api.services.drive.model.File;
 import com.google.api.services.drive.model.FileList;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
-import com.google.api.services.drive.model.About;
-import com.google.api.services.drive.model.User;
 
 import java.io.*;
 import java.security.GeneralSecurityException;
@@ -29,20 +24,11 @@ import java.util.List;
 @Service
 public class DriveService {
 
-    private static final Logger logger = LoggerFactory.getLogger(DriveService.class);
-
     private static final String APPLICATION_NAME = "Billing App Backup";
     private static final GsonFactory JSON_FACTORY = GsonFactory.getDefaultInstance();
     private static final java.io.File TOKENS_DIR = new java.io.File(System.getProperty("user.home"), ".billing_app_tokens");
     private static final List<String> SCOPES = Collections.singletonList(DriveScopes.DRIVE_FILE);
     private static final String CREDENTIALS_FILE_PATH = "/credentials.json";
-
-    // Config: Maximum number of backups to keep
-
-
-    @Value("${max.backup.count}")
-    private int MAX_BACKUP_COUNT;
-
 
     private Drive driveService;
 
@@ -71,14 +57,18 @@ public class DriveService {
                 .setAccessType("offline")
                 .build();
 
-        // 4. Check if we have credentials BEFORE trying to authorize
+        // 4. CRITICAL FIX: Check if we have credentials BEFORE trying to authorize
         Credential credential = flow.loadCredential("user");
 
         if (credential == null && !allowBrowser) {
+            // User is not logged in, and we are NOT allowed to open the browser.
+            // Return null so listBackups knows to stay silent.
             return null;
         }
 
         // 5. If we are here, we either have a credential OR we are allowed to open the browser.
+
+        // Define Browser (Linux Fix)
         AuthorizationCodeInstalledApp.Browser customBrowser = new AuthorizationCodeInstalledApp.Browser() {
             @Override
             public void browse(String url) throws IOException {
@@ -121,57 +111,12 @@ public class DriveService {
                 .setFields("id")
                 .execute();
 
-        // --- TRIGGER AUTO-CLEANUP AFTER UPLOAD ---
-        cleanupOldBackups(service);
-
         return file.getId();
-    }
-
-    /**
-     * Checks if backup count > 10 and deletes the oldest files.
-     */
-    private void cleanupOldBackups(Drive service) {
-        try {
-            // 1. Fetch list of SQL backups, sorted by createdTime DESC (Newest first)
-            String query = "trashed = false and name contains '.sql'";
-            FileList result = service.files().list()
-                    .setQ(query)
-                    .setOrderBy("createdTime desc")
-                    .setFields("files(id, name, createdTime)")
-                    .execute();
-
-            List<File> files = result.getFiles();
-
-            if (files == null || files.isEmpty()) {
-                return;
-            }
-
-            // 2. Check if we exceed the limit
-            if (files.size() > MAX_BACKUP_COUNT) {
-                logger.info("Found {} backups. Limit is {}. Deleting {} old files...",
-                        files.size(), MAX_BACKUP_COUNT, (files.size() - MAX_BACKUP_COUNT));
-
-                // 3. Identify files to delete (Everything after the 10th item)
-                List<File> filesToDelete = files.subList(MAX_BACKUP_COUNT, files.size());
-
-                // 4. Delete them
-                for (File file : filesToDelete) {
-                    try {
-                        service.files().delete(file.getId()).execute();
-                        logger.info("Deleted old backup: {} ({})", file.getName(), file.getId());
-                    } catch (Exception e) {
-                        logger.error("Failed to delete old backup file: " + file.getId(), e);
-                    }
-                }
-            }
-        } catch (Exception e) {
-            // Log error but do not throw exception, so the current upload is still considered successful
-            logger.error("Error during backup cleanup routine", e);
-        }
     }
 
     public List<File> listBackups() throws Exception {
         // allowBrowser = false.
+        // When page loads, we just want to see files. If not logged in, return empty list. DO NOT open browser.
         Drive service = getDriveService(false);
 
         if (service == null) {
@@ -222,27 +167,5 @@ public class DriveService {
             e.printStackTrace();
             throw new RuntimeException("Failed to unlink Drive account");
         }
-    }
-
-    public String getConnectedEmail() {
-        try {
-            // Do not open browser, just check if we have a valid service/token
-            Drive service = getDriveService(false);
-
-            if (service == null) {
-                return null;
-            }
-
-            // The 'about' endpoint provides user info. We specifically request the 'user' field.
-            About about = service.about().get().setFields("user").execute();
-            User user = about.getUser();
-
-            if (user != null) {
-                return user.getEmailAddress();
-            }
-        } catch (Exception e) {
-            logger.error("Failed to fetch connected Drive email", e);
-        }
-        return null;
     }
 }

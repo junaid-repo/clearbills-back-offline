@@ -1,6 +1,5 @@
 package com.management.shop.entity;
 
-import com.management.shop.listener.GlobalSearchListener;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -15,7 +14,6 @@ import java.time.LocalDateTime;
 @Data
 @Entity
 @Table(name="shop_customer")
-@EntityListeners(GlobalSearchListener.class)
 public class CustomerEntity {
 	
 	@Id
