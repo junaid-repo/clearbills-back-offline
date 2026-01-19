@@ -19,7 +19,7 @@ public class BackupService {
     private JdbcTemplate jdbcTemplate;
 
     public String createBackup() throws IOException {
-        String backupDir = System.getProperty("user.home") + System.getProperty("user.home") + "MyBillingApp_Backups";
+        String backupDir = System.getProperty("user.home") + File.separator + "MyBillingApp_Backups";
         Path path = Paths.get(backupDir, new String[0]);
         if (!Files.exists(path, new java.nio.file.LinkOption[0]))
             Files.createDirectories(path, (FileAttribute<?>[])new FileAttribute[0]);

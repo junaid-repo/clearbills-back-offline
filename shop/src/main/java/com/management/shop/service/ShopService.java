@@ -91,6 +91,7 @@ import com.management.shop.util.PDFInvoiceUtil;
 import com.management.shop.util.ReportsGenerate;
 import com.management.shop.util.Utility;
 import jakarta.transaction.Transactional;
+
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
@@ -113,6 +114,7 @@ import java.util.Random;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+
 import lombok.Generated;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -267,7 +269,7 @@ public class ShopService {
     }
 
     public List<String> extractRoles() {
-        List<String> roles = (List<String>)SecurityContextHolder.getContext().getAuthentication().getAuthorities().stream().map(GrantedAuthority::getAuthority).collect(Collectors.toList());
+        List<String> roles = (List<String>) SecurityContextHolder.getContext().getAuthentication().getAuthorities().stream().map(GrantedAuthority::getAuthority).collect(Collectors.toList());
         System.out.println("Current user roles: " + roles);
         return roles;
     }
@@ -277,7 +279,7 @@ public class ShopService {
     }
 
     public boolean checkUserStatus(String username) {
-        return ((UserInfo)this.userinfoRepo.findByUsername(username).get()).getIsActive().booleanValue();
+        return ((UserInfo) this.userinfoRepo.findByUsername(username).get()).getIsActive().booleanValue();
     }
 
     public CustomerSuccessDTO saveCustomer(CustomerRequest request) {
@@ -287,11 +289,11 @@ public class ShopService {
             existingCustomer = this.shopRepo.findByPhone(request.getPhone(), "ACTIVE", extractUsername());
         CustomerEntity ent = null;
         if (existingCustomer.size() > 0) {
-            CustomerEntity customerEntity = CustomerEntity.builder().userId(extractUsername()).id(((CustomerEntity)existingCustomer.get(0)).getId()).name(request.getName()).email(request.getEmail()).createdDate(LocalDateTime.now()).gstNumber(request.getGstNumber()).isActive(Boolean.TRUE).state(request.getCustomerState()).city(request.getCity()).phone(request.getPhone()).status("ACTIVE").totalSpent(((CustomerEntity)existingCustomer.get(0)).getTotalSpent()).build();
-            ent = (CustomerEntity)this.shopRepo.save(customerEntity);
+            CustomerEntity customerEntity = CustomerEntity.builder().userId(extractUsername()).id(((CustomerEntity) existingCustomer.get(0)).getId()).name(request.getName()).email(request.getEmail()).createdDate(LocalDateTime.now()).gstNumber(request.getGstNumber()).isActive(Boolean.TRUE).state(request.getCustomerState()).city(request.getCity()).phone(request.getPhone()).status("ACTIVE").totalSpent(((CustomerEntity) existingCustomer.get(0)).getTotalSpent()).build();
+            ent = (CustomerEntity) this.shopRepo.save(customerEntity);
         } else {
             CustomerEntity customerEntity = CustomerEntity.builder().userId(extractUsername()).name(request.getName()).email(request.getEmail()).createdDate(LocalDateTime.now()).state(request.getCustomerState()).gstNumber(request.getGstNumber()).city(request.getCity()).isActive(Boolean.TRUE).phone(request.getPhone()).status("ACTIVE").totalSpent(Double.valueOf(0.0D)).build();
-            ent = (CustomerEntity)this.shopRepo.save(customerEntity);
+            ent = (CustomerEntity) this.shopRepo.save(customerEntity);
         }
         this.salesCacheService.evictUserCustomers(extractUsername());
         this.salesCacheService.evictsUserAnalytics(extractUsername());
@@ -312,15 +314,17 @@ public class ShopService {
     public CustomerEntity saveCustomerForBilling(CustomerRequest request) {
         System.out.println("entered into saveCustomer with" + request.toString());
         List<CustomerEntity> existingCustomer = new ArrayList<>();
-        if (!request.getPhone().equals("") && request.getPhone() != null && !request.getPhone().equals("0000000000"))
+
+
+        if (request.getPhone() != null)
             existingCustomer = this.shopRepo.findByPhone(request.getPhone(), "ACTIVE", extractUsername());
         CustomerEntity ent = null;
         if (existingCustomer.size() > 0) {
-            CustomerEntity customerEntity = CustomerEntity.builder().id(((CustomerEntity)existingCustomer.get(0)).getId()).userId(extractUsername()).name(request.getName()).email(request.getEmail()).state(request.getCustomerState()).gstNumber(request.getGstNumber()).city(request.getCity()).createdDate(LocalDateTime.now()).phone(request.getPhone()).status("ACTIVE").isActive(Boolean.TRUE).totalSpent(((CustomerEntity)existingCustomer.get(0)).getTotalSpent()).build();
-            ent = (CustomerEntity)this.shopRepo.save(customerEntity);
+            CustomerEntity customerEntity = CustomerEntity.builder().id(((CustomerEntity) existingCustomer.get(0)).getId()).userId(extractUsername()).name(request.getName()).email(request.getEmail()).state(request.getCustomerState()).gstNumber(request.getGstNumber()).city(request.getCity()).createdDate(LocalDateTime.now()).phone(request.getPhone()).status("ACTIVE").isActive(Boolean.TRUE).totalSpent(((CustomerEntity) existingCustomer.get(0)).getTotalSpent()).build();
+            ent = (CustomerEntity) this.shopRepo.save(customerEntity);
         } else {
             CustomerEntity customerEntity = CustomerEntity.builder().name(request.getName()).userId(extractUsername()).email(request.getEmail()).state(request.getCustomerState()).gstNumber(request.getGstNumber()).city(request.getCity()).createdDate(LocalDateTime.now()).phone(request.getPhone()).status("ACTIVE").isActive(Boolean.TRUE).totalSpent(Double.valueOf(0.0D)).build();
-            ent = (CustomerEntity)this.shopRepo.save(customerEntity);
+            ent = (CustomerEntity) this.shopRepo.save(customerEntity);
         }
         if (ent.getId() != null) {
             try {
@@ -353,7 +357,7 @@ public class ShopService {
         } else {
             productEntity = ProductEntity.builder().name((request.getName() == null) ? "" : request.getName()).userId(extractUsername()).category((request.getCategory() == null) ? "" : request.getCategory()).active(Boolean.valueOf(true)).status(status).stock(request.getStock()).taxPercent(request.getTax()).costPrice(request.getCostPrice()).price(request.getPrice()).hsn((request.getHsn() == null) ? "" : request.getHsn()).createdDate(LocalDateTime.now()).updatedDate(LocalDateTime.now()).updatedBy(extractUsername()).build();
         }
-        ProductEntity ent = (ProductEntity)this.prodRepo.save(productEntity);
+        ProductEntity ent = (ProductEntity) this.prodRepo.save(productEntity);
         if (ent.getId() != null) {
             try {
                 this.salesCacheService.evictUserProducts(extractUsername());
@@ -371,7 +375,7 @@ public class ShopService {
             status = "Out of Stock";
         System.out.println("The updated request" + request.getTax());
         ProductEntity productEntity = ProductEntity.builder().id(request.getSelectedProductId()).name(request.getName()).active(Boolean.valueOf(true)).category(request.getCategory()).userId(extractUsername()).status(status).stock(request.getStock()).hsn(request.getHsn()).taxPercent(request.getTax()).price(request.getPrice()).costPrice(request.getCostPrice()).build();
-        ProductEntity ent = (ProductEntity)this.prodRepo.save(productEntity);
+        ProductEntity ent = (ProductEntity) this.prodRepo.save(productEntity);
         if (ent.getId() != null) {
             try {
                 this.salesCacheService.evictUserProducts(extractUsername());
@@ -407,10 +411,10 @@ public class ShopService {
         if ("costPrice".equalsIgnoreCase(sortField))
             sortField = "cost_price";
         Sort.Direction direction = "asc".equalsIgnoreCase(dir) ? Sort.Direction.ASC : Sort.Direction.DESC;
-        Sort sortOrder = Sort.by(direction, new String[] { sortField });
+        Sort sortOrder = Sort.by(direction, new String[]{sortField});
         PageRequest pageRequest = PageRequest.of(page - 1, limit, sortOrder);
         String username = extractUsername();
-        return this.prodRepo.findAllActiveProductsWithPagination(Boolean.TRUE, username, search, (Pageable)pageRequest);
+        return this.prodRepo.findAllActiveProductsWithPagination(Boolean.TRUE, username, search, (Pageable) pageRequest);
     }
 
     @Cacheable(value = {"products"}, keyGenerator = "userScopedKeyGenerator")
@@ -423,10 +427,10 @@ public class ShopService {
         if ("costPrice".equalsIgnoreCase(sortField))
             sortField = "cost_price";
         Sort.Direction direction = "asc".equalsIgnoreCase(dir) ? Sort.Direction.ASC : Sort.Direction.DESC;
-        Sort sortOrder = Sort.by(direction, new String[] { sortField });
+        Sort sortOrder = Sort.by(direction, new String[]{sortField});
         PageRequest pageRequest = PageRequest.of(page - 1, limit, sortOrder);
         String username = extractUsername();
-        return this.prodRepo.findAllActiveProductsWithPaginationForBilling(Boolean.TRUE, username, search, (Pageable)pageRequest);
+        return this.prodRepo.findAllActiveProductsWithPaginationForBilling(Boolean.TRUE, username, search, (Pageable) pageRequest);
     }
 
     @Cacheable(value = {"customers"}, keyGenerator = "userScopedKeyGenerator")
@@ -439,12 +443,12 @@ public class ShopService {
         if ("totalSpent".equalsIgnoreCase(sortField))
             sortField = "total_spent";
         Sort.Direction direction = dir.equalsIgnoreCase("desc") ? Sort.Direction.ASC : Sort.Direction.DESC;
-        Sort sortOrder = Sort.by(direction, new String[] { sortField });
+        Sort sortOrder = Sort.by(direction, new String[]{sortField});
         PageRequest pageRequest = PageRequest.of(page - 1, size, sortOrder);
         String username = extractUsername();
         Page<CustomerEntity> response = null;
         try {
-            response = this.shopRepo.findAllCustomersWithPagination(username, search, (Pageable)pageRequest, Boolean.TRUE);
+            response = this.shopRepo.findAllCustomersWithPagination(username, search, (Pageable) pageRequest, Boolean.TRUE);
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -460,12 +464,12 @@ public class ShopService {
         if ("totalSpent".equalsIgnoreCase(sortField))
             sortField = "total_spent";
         Sort.Direction direction = Sort.Direction.DESC;
-        Sort sortOrder = Sort.by(direction, new String[] { sortField });
+        Sort sortOrder = Sort.by(direction, new String[]{sortField});
         PageRequest pageRequest = PageRequest.of(page - 1, size, sortOrder);
         String username = extractUsername();
         Page<CustomerEntity> response = null;
         try {
-            response = this.shopRepo.findAllCustomersWithPagination(username, search, (Pageable)pageRequest, Boolean.TRUE);
+            response = this.shopRepo.findAllCustomersWithPagination(username, search, (Pageable) pageRequest, Boolean.TRUE);
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -480,15 +484,15 @@ public class ShopService {
         UserSettingsEntity userSettingsEntity = this.userSettingsRepo.findByUsername(extractUsername());
         Boolean sendInvoice = Boolean.valueOf(true);
         BillingEntity billingEntity = BillingEntity.builder().customerId(request.getSelectedCustomer().getId()).unitsSold(unitsSold).taxAmount(request.getTax()).userId(extractUsername()).totalAmount(request.getTotal()).payingAmount(request.getPayingAmount()).gstin(request.getGstin()).dueReminderCount(Integer.valueOf(0)).remainingAmount(request.getRemainingAmount()).discountPercent(request.getDiscountPercentage()).remarks(request.getRemarks()).subTotalAmount(Double.valueOf(request.getTotal().doubleValue() - request.getTax().doubleValue())).createdDate(LocalDateTime.now()).build();
-        BillingEntity billResponse = (BillingEntity)this.billRepo.save(billingEntity);
+        BillingEntity billResponse = (BillingEntity) this.billRepo.save(billingEntity);
         if (userSettingsEntity != null) {
             sendInvoice = userSettingsEntity.getAutoSendInvoice();
             String orderPrefix = userSettingsEntity.getSerialNumberPattern();
             String datePart = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"));
-            String sequentialPart = String.format("%04d", new Object[] { billResponse.getId() });
+            String sequentialPart = String.format("%04d", new Object[]{billResponse.getId()});
             String invoiceNumber = "FMS-" + datePart + "-" + sequentialPart;
             if (orderPrefix != null) {
-                invoiceNumber = orderPrefix + "-" + orderPrefix + "-" + datePart;
+                invoiceNumber = orderPrefix + "-" + datePart + "-" + sequentialPart;
                 billResponse.setInvoiceNumber(invoiceNumber);
                 this.billRepo.save(billResponse);
             } else {
@@ -496,7 +500,7 @@ public class ShopService {
                 this.billRepo.save(billResponse);
             }
         }
-        Double[] totalProfitOnCP = { Double.valueOf(0.0D) };
+        Double[] totalProfitOnCP = {Double.valueOf(0.0D)};
         if (billResponse.getId() != null) {
             request.getCart().stream().forEach(obj -> {
                 ProductEntity prodRes = this.prodRepo.findByIdAndUserId(obj.getId(), extractUsername());
@@ -514,7 +518,7 @@ public class ShopService {
                 totalProfitOnCP[0] = Double.valueOf(totalProfitOnCP[0].doubleValue() + Math.round(profitOnCp.doubleValue()));
                 ProductSalesEntity gstCalc = getGSTBreakDown(request.getSelectedCustomer(), obj, prodRes, extractUsername());
                 ProductSalesEntity productSalesEntity = ProductSalesEntity.builder().billingId(billResponse.getId()).profitOnCP(profitOnCp).sgstPercentage(gstCalc.getSgstPercentage()).sgst(gstCalc.getSgst()).cgstPercentage(gstCalc.getCgstPercentage()).cgst(gstCalc.getCgst()).igstPercentage(gstCalc.getIgstPercentage()).igst(gstCalc.getIgst()).productId(obj.getId()).productDetails(obj.getDetails()).userId(extractUsername()).discountPercentage(obj.getDiscountPercentage()).quantity(obj.getQuantity()).tax(gstCalc.getTax()).subTotal(gstCalc.getSubTotal()).total(total).updatedAt(LocalDateTime.now()).build();
-                ProductSalesEntity prodSalesResponse = (ProductSalesEntity)this.prodSalesRepo.save(productSalesEntity);
+                ProductSalesEntity prodSalesResponse = (ProductSalesEntity) this.prodSalesRepo.save(productSalesEntity);
                 try {
                     String str = this.billingProcess.saveGstListing(billResponse.getInvoiceNumber(), extractUsername());
                 } catch (Exception e) {
@@ -552,9 +556,9 @@ public class ShopService {
                     Map<String, Object> emailContent = this.emailTemplate.generateOrderHtml(order, extractUsername());
                     CompletableFuture<String> futureResult = this.email.sendEmail(order.getCustomerEmail(), billResponse
                                     .getInvoiceNumber(), order.getCustomerName(),
-                            generateGSTInvoicePdf(billResponse.getInvoiceNumber()), (String)emailContent.get("htmlTemplate"), (String)emailContent.get("shopName"));
+                            generateGSTInvoicePdf(billResponse.getInvoiceNumber()), (String) emailContent.get("htmlTemplate"), (String) emailContent.get("shopName"));
                     System.out.println(futureResult);
-                } catch (MailjetException|MailjetSocketTimeoutException e) {
+                } catch (MailjetException | MailjetSocketTimeoutException e) {
                     e.printStackTrace();
                 }
             }
@@ -603,11 +607,11 @@ public class ShopService {
         igst *= qty;
         totalTax *= qty;
         return ProductSalesEntity.builder()
-                .cgstPercentage(Integer.valueOf((int)Math.round(cgstPercent)))
+                .cgstPercentage(Integer.valueOf((int) Math.round(cgstPercent)))
                 .cgst(Double.valueOf(round2(cgst)))
-                .sgstPercentage(Integer.valueOf((int)Math.round(sgstPercent)))
+                .sgstPercentage(Integer.valueOf((int) Math.round(sgstPercent)))
                 .sgst(Double.valueOf(round2(sgst)))
-                .igstPercentage(Integer.valueOf((int)Math.round(igstPercent)))
+                .igstPercentage(Integer.valueOf((int) Math.round(igstPercent)))
                 .igst(Double.valueOf(round2(igst)))
                 .tax(Double.valueOf(round2(totalTax)))
                 .subTotal(Double.valueOf(round2(basePrice)))
@@ -633,24 +637,24 @@ public class ShopService {
         if ("paid".equalsIgnoreCase(sortField))
             sortField = "paying_amount";
         Sort.Direction direction = "asc".equalsIgnoreCase(dir) ? Sort.Direction.ASC : Sort.Direction.DESC;
-        Sort sortOrder = Sort.by(direction, new String[] { sortField });
+        Sort sortOrder = Sort.by(direction, new String[]{sortField});
         PageRequest pageRequest = PageRequest.of(Math.max(0, page - 1), size, sortOrder);
         Page<BillingEntity> billingPage = null;
         if (searchTerm != null && !searchTerm.trim().isEmpty()) {
             try {
-                billingPage = this.billRepo.findByUserIdAndSearchNative(username, searchTerm.trim(), (Pageable)pageRequest);
+                billingPage = this.billRepo.findByUserIdAndSearchNative(username, searchTerm.trim(), (Pageable) pageRequest);
             } catch (Exception e) {
                 e.printStackTrace();
             }
         } else {
-            billingPage = this.billRepo.findAllByUserId(username, (Pageable)pageRequest);
+            billingPage = this.billRepo.findAllByUserId(username, (Pageable) pageRequest);
         }
         List<SalesResponseDTO> dtoList = billingPage.getContent().stream().map(obj -> {
             String customerName = this.shopRepo.findByIdAndUserId(obj.getCustomerId(), username).getName();
             String paymentStatus = this.salesPaymentRepo.findPaymentDetails(obj.getId(), username).getStatus();
             return SalesResponseDTO.builder().customer(customerName).remarks(obj.getRemarks()).date(obj.getCreatedDate().toString()).id(obj.getInvoiceNumber()).total(obj.getTotalAmount()).paid(obj.getPayingAmount()).status(paymentStatus).gstin(obj.getGstin()).reminderCount(obj.getDueReminderCount()).build();
         }).toList();
-        return (Page<SalesResponseDTO>)new PageImpl(dtoList, (Pageable)pageRequest, billingPage.getTotalElements());
+        return (Page<SalesResponseDTO>) new PageImpl(dtoList, (Pageable) pageRequest, billingPage.getTotalElements());
     }
 
     @Cacheable(value = {"sales"}, keyGenerator = "userScopedKeyGenerator")
@@ -675,16 +679,16 @@ public class ShopService {
         if ("invoiceNumber".equalsIgnoreCase(sortField) || "invoice".equalsIgnoreCase(sortField))
             sortField = "invoice_number";
         Sort.Direction direction = "asc".equalsIgnoreCase(dir) ? Sort.Direction.ASC : Sort.Direction.DESC;
-        Sort sortOrder = Sort.by(direction, new String[] { sortField });
+        Sort sortOrder = Sort.by(direction, new String[]{sortField});
         PageRequest pageRequest = PageRequest.of(Math.max(0, page.intValue() - 1), size.intValue(), sortOrder);
         String username = extractUsername();
-        Page<BillingEntity> billingPage = this.billRepo.findAllByUserId(username, (Pageable)pageRequest);
+        Page<BillingEntity> billingPage = this.billRepo.findAllByUserId(username, (Pageable) pageRequest);
         List<SalesResponseDTO> dtoList = billingPage.getContent().stream().map(obj -> {
             String customerName = this.shopRepo.findByIdAndUserId(obj.getCustomerId(), username).getName();
             String paymentStatus = this.salesPaymentRepo.findPaymentDetails(obj.getId(), username).getStatus();
             return SalesResponseDTO.builder().customer(customerName).remarks(obj.getRemarks()).date(obj.getCreatedDate().toString()).id(obj.getInvoiceNumber()).total(obj.getTotalAmount()).gstin(obj.getGstin()).status(paymentStatus).build();
         }).toList();
-        return (Page<SalesResponseDTO>)new PageImpl(dtoList, (Pageable)pageRequest, billingPage.getTotalElements());
+        return (Page<SalesResponseDTO>) new PageImpl(dtoList, (Pageable) pageRequest, billingPage.getTotalElements());
     }
 
     @Cacheable(value = {"dashboard"}, keyGenerator = "userScopedKeyGenerator")
@@ -715,8 +719,8 @@ public class ShopService {
         Integer outOfStockCount = Integer.valueOf(0);
         Integer countOfOrders = Integer.valueOf(0);
         for (BillingEntity obj : billList) {
-            monthlyRevenue = Integer.valueOf((int)(monthlyRevenue.intValue() + obj.getTotalAmount().doubleValue()));
-            taxCollected = Integer.valueOf((int)(taxCollected.intValue() + obj.getTaxAmount().doubleValue()));
+            monthlyRevenue = Integer.valueOf((int) (monthlyRevenue.intValue() + obj.getTotalAmount().doubleValue()));
+            taxCollected = Integer.valueOf((int) (taxCollected.intValue() + obj.getTaxAmount().doubleValue()));
             totalUnitsSold = Integer.valueOf(totalUnitsSold.intValue() + obj.getUnitsSold().intValue());
             countOfOrders = Integer.valueOf(countOfOrders.intValue() + 1);
         }
@@ -779,7 +783,7 @@ public class ShopService {
         Double gst = Double.valueOf(0.0D);
         for (ProductSalesEntity orders : prodSales)
             gst = Double.valueOf(gst.doubleValue() + orders.getTax().doubleValue());
-        List<OrderItem> items = (List<OrderItem>)prodSales.stream().map(obj -> {
+        List<OrderItem> items = (List<OrderItem>) prodSales.stream().map(obj -> {
             String username2 = "";
             if (orderReferenceNumber != null) {
                 BillingEntity billDetails2 = this.billRepo.findOrderByJustReference(orderReferenceNumber);
@@ -804,7 +808,7 @@ public class ShopService {
         Double gst = Double.valueOf(0.0D);
         for (ProductSalesEntity orders : prodSales)
             gst = Double.valueOf(gst.doubleValue() + orders.getTax().doubleValue());
-        List<OrderItem> items = (List<OrderItem>)prodSales.stream().map(obj -> {
+        List<OrderItem> items = (List<OrderItem>) prodSales.stream().map(obj -> {
             System.out.println("The productId is " + obj.getProductId());
             ProductEntity prodRes = this.prodRepo.findByIdAndUserId(obj.getProductId(), extractUsername());
             return OrderItem.builder().productName(prodRes.getName()).unitPrice(obj.getTotal().doubleValue()).gst(obj.getTax().doubleValue()).details(obj.getProductDetails()).quantity(obj.getQuantity().intValue()).build();
@@ -838,7 +842,7 @@ public class ShopService {
 
     public List<ReportResponse> getReportsList(Integer limit) {
         List<Report> reportList = this.reportDRepo.findByLimit(limit, extractUsername());
-        return (List<ReportResponse>)reportList.stream().map(obj -> ReportResponse.builder().name(obj.getName()).createdAt(obj.getCreatedAt()).fileName(obj.getFileName()).fromDate(obj.getFromDate()).toDate(obj.getToDate()).id(obj.getId()).status(obj.getStatus()).build())
+        return (List<ReportResponse>) reportList.stream().map(obj -> ReportResponse.builder().name(obj.getName()).createdAt(obj.getCreatedAt()).fileName(obj.getFileName()).fromDate(obj.getFromDate()).toDate(obj.getToDate()).id(obj.getId()).status(obj.getStatus()).build())
 
                 .collect(Collectors.toList());
     }
@@ -890,17 +894,18 @@ public class ShopService {
 
     public String saveEditableUserProfilePic(MultipartFile profilePic, String username) throws IOException {
         System.out.println("entered saveEditableUserProfilePic with username " + username);
-        String baseDir = System.getProperty("user.home") + System.getProperty("user.home") + "MyBillingApp_Data" + File.separator + "ProfilePics";
+        String baseDir = System.getProperty("user.home") + File.separator + "MyBillingApp_Data" + File.separator + "ProfilePics";
+        System.out.println("The base directory for profile pics is " + baseDir);
         File directory = new File(baseDir);
         if (!directory.exists())
             directory.mkdirs();
         String originalFilename = (new File(profilePic.getOriginalFilename())).getName();
         String newFileName = username + "_" + username + "_" + System.currentTimeMillis();
-        File serverFile = new File(directory.getAbsolutePath() + directory.getAbsolutePath() + File.separator);
+        File serverFile = new File(directory.getAbsolutePath() + File.separator + newFileName);
         profilePic.transferTo(serverFile);
         UserProfilePicEntity picRes = this.userProfilePicRepo.findByUsername(username);
         if (picRes != null && picRes.getProfilePic() != null) {
-            File oldFile = new File(directory.getAbsolutePath() + directory.getAbsolutePath() + File.separator);
+            File oldFile = new File(directory.getAbsolutePath() +  File.separator+picRes.getProfilePic());
             if (oldFile.exists())
                 oldFile.delete();
         }
@@ -1003,8 +1008,8 @@ public class ShopService {
             try {
                 UserProfilePicEntity picRes = this.userProfilePicRepo.findByUsername(username);
                 if (picRes != null && picRes.getProfilePic() != null) {
-                    String baseDir = System.getProperty("user.home") + System.getProperty("user.home") + "MyBillingApp_Data" + File.separator + "ProfilePics";
-                    File file = new File(baseDir + baseDir + File.separator);
+                    String baseDir = System.getProperty("user.home") + File.separator + "MyBillingApp_Data" + File.separator + "ProfilePics";
+                    File file = new File(baseDir  + File.separator+ picRes.getProfilePic());
                     if (file.exists()) {
                         content = Files.readAllBytes(file.toPath());
                     } else {
@@ -1019,7 +1024,7 @@ public class ShopService {
             String imageUrl = res.getProfilePiclink();
             try {
                 URL url = new URL(imageUrl);
-                HttpURLConnection connection = (HttpURLConnection)url.openConnection();
+                HttpURLConnection connection = (HttpURLConnection) url.openConnection();
                 connection.setRequestMethod("GET");
                 InputStream inputStream = connection.getInputStream();
                 try {
@@ -1084,15 +1089,15 @@ public class ShopService {
         LocalDateTime endDate = LocalDate.parse(request.getEndDate()).atTime(LocalTime.MAX);
         List<Object[]> resultsSales = this.billRepo.getMonthlySalesSummary(startDate, endDate, userId);
         for (Object[] row : resultsSales) {
-            String month = (String)row[0];
+            String month = (String) row[0];
             labels.add(month);
-            Long count = Long.valueOf(((Number)row[1]).longValue());
+            Long count = Long.valueOf(((Number) row[1]).longValue());
             sales.add(count);
         }
         try {
             List<Object[]> resultsStocks = this.billRepo.getMonthlyStocksSold(startDate, endDate, userId);
             for (Object[] row : resultsStocks) {
-                Long count = Long.valueOf(((Number)row[1]).longValue());
+                Long count = Long.valueOf(((Number) row[1]).longValue());
                 stocks.add(count);
             }
         } catch (Exception e) {
@@ -1100,13 +1105,13 @@ public class ShopService {
         }
         List<Object[]> resultsTaxes = this.billRepo.getMonthlyTaxesSummary(startDate, endDate, userId);
         for (Object[] row : resultsTaxes) {
-            Integer count = Integer.valueOf(((Number)row[1]).intValue());
+            Integer count = Integer.valueOf(((Number) row[1]).intValue());
             taxes.add(count);
         }
         try {
             List<Object[]> resultsCustomers = this.shopRepo.getMonthlyCustomerCount(startDate, endDate, userId);
             for (Object[] row : resultsCustomers) {
-                Integer count = Integer.valueOf(((Number)row[1]).intValue());
+                Integer count = Integer.valueOf(((Number) row[1]).intValue());
                 customers.add(count);
             }
         } catch (Exception e) {
@@ -1114,15 +1119,15 @@ public class ShopService {
         }
         List<Object[]> resultsOnlinePaymentCount = this.salesPaymentRepo.getMonthlyPaymentCounts(startDate, endDate, userId);
         for (Object[] row : resultsOnlinePaymentCount) {
-            Integer count = Integer.valueOf(((Number)row[1]).intValue());
+            Integer count = Integer.valueOf(((Number) row[1]).intValue());
             onlinePaymentCounts.add(count);
         }
         for (Object[] row : resultsSales) {
             double percentage = 0.08D + 0.12000000000000001D * this.random.nextDouble();
-            System.out.println("The profits on cp are " + ((Number)row[2]).longValue());
-            Long count = Long.valueOf(((Number)row[1]).longValue());
-            Long estimatedProfit = Long.valueOf(((Number)row[1]).longValue());
-            profits.add(Long.valueOf(((Number)row[2]).longValue()));
+            System.out.println("The profits on cp are " + ((Number) row[2]).longValue());
+            Long count = Long.valueOf(((Number) row[1]).longValue());
+            Long estimatedProfit = Long.valueOf(((Number) row[1]).longValue());
+            profits.add(Long.valueOf(((Number) row[2]).longValue()));
         }
         response.setCustomers(customers);
         response.setLabels(labels);
@@ -1157,7 +1162,7 @@ public class ShopService {
         if ("createdAt".equalsIgnoreCase(sortField))
             sortField = "created_date";
         Sort.Direction direction = "asc".equalsIgnoreCase(sort) ? Sort.Direction.ASC : Sort.Direction.DESC;
-        Sort sortOrder = Sort.by(direction, new String[] { sortField });
+        Sort sortOrder = Sort.by(direction, new String[]{sortField});
         PageRequest pageRequest = PageRequest.of(page - 1, limit, sortOrder);
         String username = extractUsername();
         Page<MessageEntity> notificationsList = null;
@@ -1170,12 +1175,12 @@ public class ShopService {
             }
             if (seen.equals("flagged")) {
                 Boolean isFlagged = Boolean.valueOf(true);
-                notificationsList = this.notiRepo.findAllNotificationsByFlaggedStatus(extractUsername(), domain, isFlagged, Boolean.FALSE, (Pageable)pageRequest);
+                notificationsList = this.notiRepo.findAllNotificationsByFlaggedStatus(extractUsername(), domain, isFlagged, Boolean.FALSE, (Pageable) pageRequest);
             } else {
-                notificationsList = this.notiRepo.findAllNotificationsByReadStatus(extractUsername(), domain, isRead, Boolean.FALSE, (Pageable)pageRequest);
+                notificationsList = this.notiRepo.findAllNotificationsByReadStatus(extractUsername(), domain, isRead, Boolean.FALSE, (Pageable) pageRequest);
             }
         } else {
-            notificationsList = this.notiRepo.findAllNotifications(extractUsername(), domain, Boolean.FALSE, (Pageable)pageRequest);
+            notificationsList = this.notiRepo.findAllNotifications(extractUsername(), domain, Boolean.FALSE, (Pageable) pageRequest);
         }
         for (MessageEntity obj : notificationsList)
             notifications.add(ShopNotifications.builder().createdAt(obj.getCreatedDate()).title(obj.getTitle()).id(String.valueOf(obj.getId())).subject(obj.getSubject()).message(obj.getDetails()).seen(obj.getIsRead().booleanValue()).domain(obj.getDomain()).searchKey(obj.getSearchKey()).isFlagged(obj.getIsFlagged()).build());
@@ -1265,10 +1270,10 @@ public class ShopService {
         }
         for (Object[] row : resultsSales) {
             WeeklySales weeklysales = new WeeklySales();
-            String day = (String)row[0];
+            String day = (String) row[0];
             labels.add(day);
-            Long count = Long.valueOf(((Number)row[1]).longValue());
-            Integer stocksCount = Integer.valueOf(((Number)row[3]).intValue());
+            Long count = Long.valueOf(((Number) row[1]).longValue());
+            Integer stocksCount = Integer.valueOf(((Number) row[3]).intValue());
             sales.add(count);
             weeklysales.setDay(day);
             weeklysales.setUnitsSold(stocksCount.intValue());
@@ -1332,7 +1337,7 @@ public class ShopService {
             billingDetails = this.billRepo.findSalesNDays(username, LocalDateTime.now().minusMonths(1L), LocalDateTime.now());
         if (range.equals("lastYear"))
             billingDetails = this.billRepo.findSalesNDays(username, LocalDateTime.now().minusYears(1L), LocalDateTime.now());
-        Double[] actualSalesList = { Double.valueOf(0.0D) };
+        Double[] actualSalesList = {Double.valueOf(0.0D)};
         billingDetails.stream().forEach(obj -> actualSalesList[0] = Double.valueOf(actualSalesList[0].doubleValue() + obj.getTotalAmount().doubleValue()));
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("MMM d, yyyy");
         String fromDateStr = (existingGoals != null && existingGoals.getFromDate() != null) ? existingGoals.getFromDate().format(formatter) : null;
@@ -1363,7 +1368,7 @@ public class ShopService {
         if (factor.equals("topGrossing"))
             topProducts = this.prodSalesRepo.findTopGrossingProducts(extractUsername(), startDate, endDate, count);
         if (topProducts.size() > 0)
-            response = (List<TopProductDto>)topProducts.stream().map(obj -> TopProductDto.builder().category(obj.getCategory()).currentStock(obj.getCurrentStock().intValue()).productName(obj.getProductName()).amount(obj.getRevenue().doubleValue()).count(obj.getUnitsSold().longValue()).build()).collect(Collectors.toList());
+            response = (List<TopProductDto>) topProducts.stream().map(obj -> TopProductDto.builder().category(obj.getCategory()).currentStock(obj.getCurrentStock().intValue()).productName(obj.getProductName()).amount(obj.getRevenue().doubleValue()).count(obj.getUnitsSold().longValue()).build()).collect(Collectors.toList());
         System.out.println("The top products are " + response);
         return response;
     }
@@ -1384,7 +1389,7 @@ public class ShopService {
             startDate = LocalDateTime.now().toLocalDate().atStartOfDay();
         List<BillingEntity> billList = this.billRepo.findTopNSalesForGivenRange(extractUsername(), startDate, endDate, count);
         if (billList.size() > 0)
-            response = (List<TopOrdersDto>)billList.stream().map(obj -> {
+            response = (List<TopOrdersDto>) billList.stream().map(obj -> {
                 String customerName = this.shopRepo.findByIdAndUserId(obj.getCustomerId(), extractUsername()).getName();
                 String paymentStatus = this.salesPaymentRepo.findPaymentDetails(obj.getId(), extractUsername()).getStatus();
                 DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd-MM-yyyy");
@@ -1411,8 +1416,8 @@ public class ShopService {
         List<Map<String, Object>> rawData = this.salesPaymentRepo.getPaymentBreakdown(extractUsername(), startDate, endDate);
         Map<String, Double> result = new HashMap<>();
         for (Map<String, Object> row : rawData) {
-            String method = (String)row.get("paymentMethod");
-            Number count = (Number)row.get("count");
+            String method = (String) row.get("paymentMethod");
+            Number count = (Number) row.get("count");
             result.put(method.toLowerCase(), Double.valueOf(count.doubleValue()));
         }
         return result;
@@ -1421,17 +1426,17 @@ public class ShopService {
     public String updateShopLogo(MultipartFile shopLogo) throws IOException {
         String username = extractUsername();
         System.out.println("entered updateShopLogo with username " + username);
-        String baseDir = System.getProperty("user.home") + System.getProperty("user.home") + "MyBillingApp_Data" + File.separator + "ShopLogos";
+        String baseDir = System.getProperty("user.home") + File.separator + "MyBillingApp_Data" + File.separator + "ShopLogos";
         File directory = new File(baseDir);
         if (!directory.exists())
             directory.mkdirs();
         String originalFilename = (new File(shopLogo.getOriginalFilename())).getName();
         String newFileName = username + "_shop_" + username + "_" + System.currentTimeMillis();
-        File serverFile = new File(directory.getAbsolutePath() + directory.getAbsolutePath() + File.separator);
+        File serverFile = new File(directory.getAbsolutePath() + File.separator+newFileName);
         shopLogo.transferTo(serverFile);
         UserProfilePicEntity picRes = this.userProfilePicRepo.findByUsername(username);
         if (picRes != null && picRes.getShopLogo() != null) {
-            File oldFile = new File(directory.getAbsolutePath() + directory.getAbsolutePath() + File.separator);
+            File oldFile = new File(directory.getAbsolutePath() + File.separator+picRes.getShopLogo());
             if (oldFile.exists())
                 oldFile.delete();
         }
@@ -1458,11 +1463,11 @@ public class ShopService {
         System.out.println("ShopBasicDetailsRequest with request->" + request);
         this.shopBasicRepo.removeExistingBasicDetails(extractUsername());
         ShopBasicEntity shopEntity = ShopBasicEntity.builder().shopName(safe(request.getShopName())).shopSlogan(safe(request.getShopSlogan())).shopPhone(safe(request.getShopPhone())).shopEmail(safe(request.getShopEmail())).address(safe(request.getShopAddress())).shopPincode(safe(request.getShopPincode())).shopCity(safe(request.getShopCity())).shopState(safe(request.getShopState())).userId(extractUsername()).updatedBy(extractUsername()).updatedAt(LocalDateTime.now()).build();
-        ShopBasicEntity res = (ShopBasicEntity)this.shopBasicRepo.save(shopEntity);
+        ShopBasicEntity res = (ShopBasicEntity) this.shopBasicRepo.save(shopEntity);
         if (res != null) {
             ShopFinanceEntity shopFinanceEntity = ShopFinanceEntity.builder().gstin(safe(request.getGstin())).panNumber(safe(request.getPanNumber())).userId(extractUsername()).updatedBy(extractUsername()).updatedAt(LocalDateTime.now()).build();
             this.shopFinanceRepo.removeShopFinanceEntities(extractUsername());
-            ShopFinanceEntity shopFinanceEntity1 = (ShopFinanceEntity)this.shopFinanceRepo.save(shopFinanceEntity);
+            ShopFinanceEntity shopFinanceEntity1 = (ShopFinanceEntity) this.shopFinanceRepo.save(shopFinanceEntity);
         }
         return (res != null) ? "Success" : "Not Successful";
     }
@@ -1471,7 +1476,7 @@ public class ShopService {
     public String updateFinanceDetails(ShopFinanceDetailsRequest request) {
         ShopFinanceEntity shopFinanceEntity = ShopFinanceEntity.builder().gstin(safe(request.getGstin())).panNumber(safe(request.getPan())).userId(extractUsername()).updatedBy(extractUsername()).updatedAt(LocalDateTime.now()).build();
         this.shopFinanceRepo.removeShopFinanceEntities(extractUsername());
-        ShopFinanceEntity finRes = (ShopFinanceEntity)this.shopFinanceRepo.save(shopFinanceEntity);
+        ShopFinanceEntity finRes = (ShopFinanceEntity) this.shopFinanceRepo.save(shopFinanceEntity);
         if (finRes != null) {
             ShopBankEntity shopBankEntity = ShopBankEntity.builder().accountHolderName(safe(request.getBankHolder())).accountNumber(safe(request.getBankAccount())).ifscCode(safe(request.getBankIfsc())).bankName(safe(request.getBankName())).branchName(safe(request.getBankAddress())).shopFinanceId(finRes.getId()).userId(extractUsername()).updatedBy(extractUsername()).updatedAt(LocalDateTime.now()).build();
             this.shopBankRepo.removeBankDetails(extractUsername());
@@ -1486,7 +1491,7 @@ public class ShopService {
 
     public String updateOtherDetails(ShopInvoiceTerms request) {
         ShopInvoiceTermsEnity shopInvoiceTermsEntity = ShopInvoiceTermsEnity.builder().term(safe(request.getTerms1())).userId(extractUsername()).updatedBy(extractUsername()).updatedAt(LocalDateTime.now()).build();
-        ShopInvoiceTermsEnity res = (ShopInvoiceTermsEnity)this.shopInvoiceTermsRepo.save(shopInvoiceTermsEntity);
+        ShopInvoiceTermsEnity res = (ShopInvoiceTermsEnity) this.shopInvoiceTermsRepo.save(shopInvoiceTermsEntity);
         return (res != null) ? "Success" : "Not Successful";
     }
 
@@ -1495,8 +1500,8 @@ public class ShopService {
         UserProfilePicEntity picRes = this.userProfilePicRepo.findByUsername(username);
         if (picRes == null || picRes.getShopLogo() == null)
             return null;
-        String baseDir = System.getProperty("user.home") + System.getProperty("user.home") + "MyBillingApp_Data" + File.separator + "ShopLogos";
-        File file = new File(baseDir + baseDir + File.separator);
+        String baseDir = System.getProperty("user.home") + File.separator + "MyBillingApp_Data" + File.separator + "ShopLogos";
+        File file = new File(baseDir +  File.separator+picRes.getShopLogo());
         byte[] content = null;
         try {
             if (file.exists()) {
@@ -1524,7 +1529,7 @@ public class ShopService {
     }
 
     public Map<String, String> sendPaymentReminder(Map<String, Object> request) {
-        String orderNo = (String)request.get("orderId");
+        String orderNo = (String) request.get("orderId");
         BillingEntity billDetails = this.billRepo.findByInvoiceNumber(orderNo);
         CustomerEntity customer = this.shopRepo.findByIdAndUserId(billDetails.getCustomerId(), extractUsername(orderNo));
         Double totalAmount = billDetails.getTotalAmount();
@@ -1532,7 +1537,7 @@ public class ShopService {
         Double dueAmout = billDetails.getRemainingAmount();
         String customerName = customer.getName();
         String customerEmail = customer.getEmail();
-        String message = (String)request.get("message");
+        String message = (String) request.get("message");
         String htmlTemplate = this.emailTemplate.getPaymentReminderEmailContent(orderNo, totalAmount.doubleValue(), paidAmount.doubleValue(), dueAmout.doubleValue(), customerName, message);
         Map<String, String> response = new HashMap<>();
         response.put("status", "success");
@@ -1553,8 +1558,8 @@ public class ShopService {
 
     @Transactional
     public Map<String, Object> updateDuePayments(Map<String, Object> request) {
-        String orderNo = (String)request.get("invoiceId");
-        Double amount = Double.valueOf(Double.parseDouble((String)request.get("amount")));
+        String orderNo = (String) request.get("invoiceId");
+        Double amount = Double.valueOf(Double.parseDouble((String) request.get("amount")));
         try {
             this.billRepo.updateDuePayment(orderNo, extractUsername(), LocalDateTime.now(), amount);
             this.salesPaymentRepo.updateDueAmount(orderNo, extractUsername(), LocalDateTime.now(), amount);
@@ -1582,8 +1587,8 @@ public class ShopService {
     }
 
     public List<Map<String, Object>> getPaymentHistory(Map<String, Object> request) {
-        String orderNo = (String)request.get("orderNumber");
-        String paymentRefereceNumber = (String)request.get("PaymentReferenceNumber");
+        String orderNo = (String) request.get("orderNumber");
+        String paymentRefereceNumber = (String) request.get("PaymentReferenceNumber");
         List<Map<String, Object>> response = new ArrayList<>();
         List<PaymentHistory> historyList = this.utils.getPaymentHistory(orderNo);
         historyList.stream().forEach(obj -> {
@@ -1610,7 +1615,7 @@ public class ShopService {
             Map<String, Object> emailContent = this.emailTemplate.generateOrderHtml(order, username);
             CompletableFuture<String> futureResult = this.email.sendEmail(order.getCustomerEmail(), invoiceNumber, order
                             .getCustomerName(),
-                    generateGSTInvoicePdf(invoiceNumber), (String)emailContent.get("htmlTemplate"), (String)emailContent.get("shopName"));
+                    generateGSTInvoicePdf(invoiceNumber), (String) emailContent.get("htmlTemplate"), (String) emailContent.get("shopName"));
             System.out.println(futureResult);
         } catch (Exception e) {
             e.printStackTrace();
@@ -1632,7 +1637,7 @@ public class ShopService {
             Map<String, Object> emailContent = this.emailTemplate.generateOrderHtml(order, username);
             CompletableFuture<String> futureResult = this.email.sendEmail(order.getCustomerEmail(), invoiceNumber, order
                             .getCustomerName(),
-                    generateGSTInvoicePdf(invoiceNumber), (String)emailContent.get("htmlTemplate"), (String)emailContent.get("shopName"));
+                    generateGSTInvoicePdf(invoiceNumber), (String) emailContent.get("htmlTemplate"), (String) emailContent.get("shopName"));
             System.out.println(futureResult);
         } catch (Exception e) {
             e.printStackTrace();
@@ -1643,7 +1648,7 @@ public class ShopService {
 
     public List<Map<String, Object>> globalSearch(String globalSearchTerms, Integer limit) {
         List<GlobalSearchIndex> searchList = this.globalSearchRepo.findActiveEntities(extractUsername(), globalSearchTerms, Boolean.TRUE);
-        List<Map<String, Object>> response = (List<Map<String, Object>>)searchList.stream().map(obj -> {
+        List<Map<String, Object>> response = (List<Map<String, Object>>) searchList.stream().map(obj -> {
             Map<String, Object> responseMap = new HashMap<>();
             responseMap.put("id", obj.getSourceId());
             responseMap.put("displayName", obj.getDisplayName());
@@ -1708,14 +1713,14 @@ public class ShopService {
                 String statusName = row[0].toString();
                 double paymentValue = 0.0D;
                 if (row[1] != null)
-                    paymentValue = ((Number)row[1]).doubleValue();
+                    paymentValue = ((Number) row[1]).doubleValue();
                 PieAnalyticsMap paymentMap = new PieAnalyticsMap();
                 paymentMap.setName(statusName);
                 paymentMap.setValue(Double.valueOf(paymentValue));
                 paymentStatusList.add(paymentMap);
                 double invoiceCount = 0.0D;
                 if (row[2] != null)
-                    invoiceCount = ((Number)row[2]).doubleValue();
+                    invoiceCount = ((Number) row[2]).doubleValue();
                 PieAnalyticsMap invoiceMap = new PieAnalyticsMap();
                 invoiceMap.setName(statusName);
                 invoiceMap.setValue(Double.valueOf(invoiceCount));
@@ -1739,7 +1744,7 @@ public class ShopService {
                 String month = row[0].toString();
                 double profitValue = 0.0D;
                 if (row[1] != null)
-                    profitValue = ((Number)row[1]).doubleValue();
+                    profitValue = ((Number) row[1]).doubleValue();
                 PieAnalyticsMap profitMap = new PieAnalyticsMap();
                 profitMap.setName(month);
                 profitMap.setValue(Double.valueOf(profitValue));
@@ -1747,7 +1752,7 @@ public class ShopService {
                 totalProfit += profitValue;
                 double revenueValue = 0.0D;
                 if (row[2] != null)
-                    revenueValue = ((Number)row[2]).doubleValue();
+                    revenueValue = ((Number) row[2]).doubleValue();
                 PieAnalyticsMap revenueMap = new PieAnalyticsMap();
                 revenueMap.setName(month);
                 revenueMap.setValue(Double.valueOf(revenueValue));
@@ -1755,7 +1760,7 @@ public class ShopService {
                 totalRevenue += revenueValue;
                 double stockValue = 0.0D;
                 if (row[3] != null)
-                    stockValue = ((Number)row[3]).doubleValue();
+                    stockValue = ((Number) row[3]).doubleValue();
                 PieAnalyticsMap stockMap = new PieAnalyticsMap();
                 stockMap.setName(month);
                 stockMap.setValue(Double.valueOf(stockValue));
@@ -1763,7 +1768,7 @@ public class ShopService {
                 totalStockSold = Double.valueOf(totalStockSold.doubleValue() + stockValue);
                 double salesCountValue = 0.0D;
                 if (row[4] != null)
-                    salesCountValue = ((Number)row[4]).doubleValue();
+                    salesCountValue = ((Number) row[4]).doubleValue();
                 PieAnalyticsMap salesMap = new PieAnalyticsMap();
                 salesMap.setName(month);
                 salesMap.setValue(Double.valueOf(salesCountValue));
@@ -1787,7 +1792,7 @@ public class ShopService {
                     continue;
                 double value = 0.0D;
                 if (row[1] != null)
-                    value = ((Number)row[1]).doubleValue();
+                    value = ((Number) row[1]).doubleValue();
                 PieAnalyticsMap pieMap = new PieAnalyticsMap();
                 pieMap.setName(row[0].toString());
                 pieMap.setValue(Double.valueOf(value));
@@ -1802,7 +1807,7 @@ public class ShopService {
                     continue;
                 double value = 0.0D;
                 if (row[1] != null)
-                    value = ((Number)row[1]).doubleValue();
+                    value = ((Number) row[1]).doubleValue();
                 PieAnalyticsMap pieMap = new PieAnalyticsMap();
                 pieMap.setName(row[0].toString());
                 pieMap.setValue(Double.valueOf(value));
